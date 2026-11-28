@@ -223,10 +223,68 @@ if (process.env.TRANSPORT === 'stdio') {
 
   await server.connect(transport);
 } else {
-  // Render 使用 Streamable HTTP 模式
+  // 公開部署使用 Streamable HTTP 模式
   const app = express();
 
+  app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Authorization, Content-Type, MCP-Protocol-Version, Last-Event-ID'
+    );
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+
+    next();
+  });
+
   app.use(express.json());
+
+  app.get('/', (_req, res) => {
+    res.type('html').send(`<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>紫微命盤 MCP Server</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; background: #0b1020; color: #e8edf7; }
+      main { max-width: 760px; margin: 0 auto; padding: 12vh 24px; }
+      .eyebrow { color: #9faeea; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
+      h1 { font-size: clamp(38px, 8vw, 72px); line-height: 1; margin: 16px 0 24px; }
+      p { color: #b6c0d4; font-size: 18px; line-height: 1.7; }
+      code { color: #b9f5d0; background: #151d34; border: 1px solid #2c3a5c; border-radius: 8px; padding: 4px 8px; }
+      .card { margin-top: 36px; padding: 22px; border: 1px solid #293657; border-radius: 16px; background: #11182c; }
+      .status { color: #8ff0bd; }
+      a { color: #b9c7ff; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">iztro · Model Context Protocol</div>
+      <h1>紫微命盤 MCP Server</h1>
+      <p>提供真太陽時修正、紫微斗數排盤、宮位、三方四正、四化、流年與命盤摘要工具。</p>
+      <div class="card">
+        <p class="status">● 服務運作中</p>
+        <p>MCP Streamable HTTP endpoint：<code>/mcp</code></p>
+        <p>Health check：<a href="/health">/health</a></p>
+      </div>
+    </main>
+  </body>
+</html>`);
+  });
 
   app.get('/health', (_req, res) => {
     res.json({
